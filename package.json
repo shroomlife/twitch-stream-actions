@@ -1,0 +1,33 @@
+{
+  "name": "twitch-extension-vue-ts",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vue-tsc -b && vite build --mode production",
+    "build:dev": "vue-tsc -b && vite build --mode staging",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@giphy/js-components": "5.13.0",
+    "@giphy/js-fetch-api": "5.6.0",
+    "bootstrap": "5.3.3",
+    "canvas-confetti": "1.9.3",
+    "pinia": "2.2.6",
+    "vue": "3.5.13"
+  },
+  "devDependencies": {
+    "@iconify-json/ph": "1.2.1",
+    "@iconify/vue": "4.1.2",
+    "@types/adm-zip": "0.5.6",
+    "@types/canvas-confetti": "1.6.4",
+    "@vitejs/plugin-vue": "5.2.0",
+    "adm-zip": "0.5.16",
+    "element-plus": "2.8.8",
+    "sass": "1.81.0",
+    "typescript": "5.7.2",
+    "vite": "5.4.11",
+    "vue-tsc": "2.1.10"
+  }
+}

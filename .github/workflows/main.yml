@@ -1,0 +1,46 @@
+name: Build and Bundle
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-zip:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Set up Bun
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 'latest'
+
+      # Create .env file with variables and secrets
+      - name: Create .env file
+        run: |
+          echo "VITE_API_URL=${{ vars.VITE_API_URL }}" >> .env
+          echo "VITE_GIPHY_API_KEY=${{ secrets.VITE_GIPHY_API_KEY }}" >> .env
+
+      # Install dependencies
+      - name: Install dependencies
+        run: bun install
+
+      # Build the project
+      - name: Build the project
+        run: bun run build
+
+      # Create ZIP file
+      - name: Create ZIP file
+        run: bun run bundle.ts
+
+      # Upload the artifact
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: twitch-extension-zip
+          path: 'twitch-extension-*.zip'
