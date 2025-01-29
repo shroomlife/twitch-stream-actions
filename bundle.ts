@@ -33,9 +33,22 @@ function addFilesRecursively(folderPath: string, zipFolderPath = '') {
   })
 }
 
+// Add all files and folders from the 'public' directory, excluding root 'index.html'
 addFilesRecursively(outputDir)
+
+// Read the content of 'index.html' and add it as 'mobile.html' and 'panel.html' only if it exists
+const indexHtmlPath = path.join(outputDir, 'index.html')
+if (fs.existsSync(indexHtmlPath)) {
+  const indexHtmlContent = fs.readFileSync(indexHtmlPath)
+
+  // Add as mobile.html
+  zip.addFile('mobile.html', indexHtmlContent)
+
+  // Add as panel.html
+  zip.addFile('panel.html', indexHtmlContent)
+}
 
 // Write the zip file to disk
 zip.writeZip(outputZip)
 
-console.log(`Created ${outputZip} with contents from ${outputDir}, including all subdirectories.`)
+console.log(`Created ${outputZip} with contents from ${outputDir}, including all subdirectories including mobile.html and panel.html.`)

@@ -108,7 +108,6 @@ export const useUserStore = defineStore('userStore', {
       }
     },
     async fetchUserId(userId: string, token: string) {
-      console.log('fetchUserId', userId)
       try {
         const appStore = useAppStore();
         const response = await fetch(appStore.renderApiUrl('/api/twitch/extension/auth'), {

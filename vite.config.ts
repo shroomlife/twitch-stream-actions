@@ -11,6 +11,14 @@ const viteUserConfig: UserConfig = {
       key: 'key.pem'
     }
   },
+  build: {
+    rollupOptions: {
+      input: {
+        mobile: 'index.html',
+        panel: 'index.html'
+      }
+    }
+  },
   resolve: {
     alias: {
       '@': '/src'

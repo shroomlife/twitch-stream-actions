@@ -15,7 +15,6 @@ const handleCheckinButtonClick = async () => {
 
     isLoading.value = true;
 
-    console.log("Twtich", window.Twitch)
     const appStore = useAppStore();
     const response = await fetch(appStore.renderApiUrl('/api/twitch/extension/checkin'), {
       method: 'POST',

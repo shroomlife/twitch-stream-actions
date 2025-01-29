@@ -7,6 +7,7 @@ import { useUserStore } from '@/stores/userStore';
 import { computed, nextTick, onMounted, Ref, ref } from 'vue';
 import { ElNotification, ElButton, ElCard, ElInput, ElAlert, ElForm, ElOption, ElSelect } from 'element-plus';
 import { AddStreamGiphyRequestBody } from '@/types/global';
+import giphyMark from '@/assets/giphy-mark.gif'
 
 const userStore = useUserStore()
 
@@ -302,10 +303,14 @@ onMounted(() => {
           <Icon icon="ph:magnifying-glass" />
         </el-button>
       </el-form>
-      <div ref="contentContainer" class="content-container infinite-list flex-grow-1">
+      <div ref="contentContainer" class="content-container infinite-list flex-grow-1 rounded">
         <div ref="giphyGrid" />
       </div>
+      <div class="d-flex justify-content-end">
+        <img class="rounded" :src="giphyMark" alt="GIPHY Logo" />
+      </div>
     </div>
+
   </el-card>
 
 
@@ -327,6 +332,7 @@ onMounted(() => {
   }
 
 }
+
 .infinite-list {
   padding: 0;
   margin: 0;
@@ -337,6 +343,7 @@ onMounted(() => {
   overflow-y: scroll;
   scrollbar-width: none;
   -ms-overflow-style: none;
+
   &::-webkit-scrollbar {
     display: none;
   }
