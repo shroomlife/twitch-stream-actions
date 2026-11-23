@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build-and-zip:
     runs-on: ubuntu-latest
@@ -34,13 +37,31 @@ jobs:
       - name: Build the project
         run: bun run build
 
+      # Build and push the backend image; stage-dist from the build above is part of its context
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push stream-actions image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: service/Dockerfile
+          push: true
+          tags: shroomlife/stream-actions:${{ github.sha }}
+
       # Create ZIP file
       - name: Create ZIP file
         run: bun run bundle.ts
 
       # Upload the artifact
       - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: twitch-extension-zip
           path: 'twitch-extension-*.zip'

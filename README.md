@@ -4,7 +4,7 @@ The Twitch mobile view and desktop panel share the Neon-Myzel picker. Linked vie
 
 ## Build and upload
 
-Set the public build settings `VITE_API_URL` (production origin `https://shroomlive.de`) and `VITE_GIPHY_API_KEY`. Run `bun run build` and `bun run bundle.ts`. The ZIP contains the Twitch entries `mobile.html` and `panel.html`. The separate `stage-dist` directory contains the OBS local browser source `stage-local.html` and its relative assets. The declarative stream-control setup fits that source into the camera rectangle for each camera scene.
+Set the public build settings `VITE_API_URL` (production origin `https://actions.shroomlive.de`) and `VITE_GIPHY_API_KEY`. Run `bun run build` and `bun run bundle.ts`. The ZIP contains the Twitch entries `mobile.html` and `panel.html`. The separate `stage-dist` directory contains the OBS local browser source `stage-local.html` and its relative assets. The declarative stream-control setup fits that source into the camera rectangle for each camera scene.
 
 Twitch currently publishes 1.0.0 for extension `rzayw76j3drs9vzexj712achlc6bfi`. Create a 1.1.0 Hosted Test with Request Identity Link, the production backend origin in connect-src, and the GIPHY API and media origins in the matching allowlists. Use test accounts for a native Android check before submission for review. [Twitch release workflow](https://dev.twitch.tv/docs/extensions/life-cycle/).
 
