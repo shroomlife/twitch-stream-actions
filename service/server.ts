@@ -225,6 +225,9 @@ export const server = Bun.serve({
     if (!path.startsWith('/stream-actions/'))
       return new Response(null, { status: 404 })
     const route = path.slice('/stream-actions/'.length)
+    // Liveness for the container healthcheck: no secrets, no database access.
+    if (route === 'health' && req.method === 'GET')
+      return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
     try {
       if(route.startsWith('camera/') && req.method==='POST'){
         const credential=Buffer.from(req.headers.get('authorization')||'')
