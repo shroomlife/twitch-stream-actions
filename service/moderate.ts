@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import catalog from '../src/catalog.json'
+import { giphyApiOrigin, giphyMediaUrl } from '../src/media-hosts'
 const desktopRequire = createRequire(new URL('../../stream-control/apps/desktop/package.json',import.meta.url))
 export interface Submission {media:string; message:string; author:string}
 
@@ -8,14 +9,17 @@ async function mediaInfo(media:string) {
   const own=catalog.find(x=>x.id===media)
   if (own) return {title:own.title,preview:Bun.pathToFileURL(resolve('public/pilze',media+'.webp')).href,still:null}
   if (!/^[A-Za-z0-9]{1,80}$/.test(media)) throw Error('Unbekanntes Motiv')
-  const url=new URL('https://api.giphy.com/v1/gifs/'+media)
+  // A direct GIPHY API lookup from Robin's PC (no proxy, nothing cached): the rating must be g, the media host allowlisted.
+  const url=new URL(giphyApiOrigin+'/v1/gifs/'+media)
   url.searchParams.set('api_key',process.env.VITE_GIPHY_API_KEY || '')
-  const r=await fetch(url,{signal:AbortSignal.timeout(6000)})
+  url.searchParams.set('rating','g')
+  const r=await fetch(url,{signal:AbortSignal.timeout(6000),cache:'no-store'})
   if(!r.ok) throw Error('GIPHY nicht erreichbar')
   const {data}=await r.json()
   if(data?.id!==media || data.rating!=='g') throw Error('GIPHY-Motiv nicht bestätigt')
-  const checked=(s:string)=>{const u=new URL(s);if(u.protocol!=='https:'||!u.hostname.endsWith('.giphy.com'))throw Error();return u.href}
-  return {title:String(data.title||'GIF'), preview:checked(data.images.fixed_height.url),still:checked(data.images.fixed_height_still.url)}
+  const preview=giphyMediaUrl(data.images?.fixed_height?.url), still=giphyMediaUrl(data.images?.fixed_height_still?.url)
+  if(!preview||!still) throw Error('GIPHY-Motiv nicht bestätigt')
+  return {title:String(data.title||'GIF'), preview, still}
 }
 export async function moderate(item:Submission) {
   try {
