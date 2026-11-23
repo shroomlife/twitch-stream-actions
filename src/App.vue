@@ -1,59 +1,38 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { useUserStore } from '@/stores/userStore'
+import WaitingRoom from '@/components/WaitingRoom.vue'
+import Memories from '@/components/Memories.vue'
 import DefaultHeader from '@/components/DefaultHeader.vue'
-import { useUserStore } from './stores/userStore';
-import { useAppStore } from './stores/appStore';
-import { computed, onMounted } from 'vue';
-import { ElContainer, ElAlert, ElSkeleton } from 'element-plus';
-import StreamActions from '@/components/StreamActions.vue';
+import StreamActions from '@/components/StreamActions.vue'
 
-const userStore = useUserStore();
-const appStore = useAppStore();
-
-const isInitialized = computed(() => {
-  return userStore.getIsInitialized as boolean;
-})
-
-const computedHasCurrentStream = computed(() => {
-  return appStore.getHasCurrentStream as boolean;
-})
-
-onMounted(() => {
-  userStore.init();
-})
-
+const user = useUserStore()
+onMounted(user.init)
 </script>
 
 <template>
-  <el-container>
-    <video poster="https://shroomlive.de/video/polygons.jpg" autoplay loop muted disableremoteplayback
-      disablepictureinpicture playsinline>
-      <source src="https://shroomlive.de/video/polygons.webm" type="video/webm">
-      <source src="https://shroomlive.de/video/polygons.mp4" type="video/mp4">
-      <source src="https://shroomlive.de/video/polygons.jpg" type="image/jpg">
-    </video>
-    <DefaultHeader />
-    <main v-if="isInitialized">
-      <template v-if="userStore.getHasUser">
-        <StreamActions v-if="computedHasCurrentStream"></StreamActions>
-        <el-alert v-else type="warning" :closable="false">Aktuell läuft kein Stream.</el-alert>
-      </template>
-      <el-alert v-else type="error" :closable="false">Du musst erst deine <strong>Twitch User ID</strong> freigeben.</el-alert>
+  <div class="extension">
+    <DefaultHeader :live="user.isLive" />
+    <main class="panel">
+      <StreamActions v-if="user.status === 'ready' && user.isLive" />
+      <WaitingRoom v-else-if="user.status === 'ready' || user.status === 'signed-out' || user.status === 'link-needed'" :offline="user.status === 'ready'">
+        <p v-if="user.status === 'signed-out'">Melde dich bei Twitch an, um mitzumachen.</p>
+        <template v-if="user.status === 'link-needed'">
+          <p>Gib deine Twitch-ID frei, um Reaktionen zu schicken und deine Fotos wiederzufinden.</p>
+          <button type="button" class="button primary" @click="user.requestIdentity">Twitch-ID freigeben</button>
+        </template>
+      </WaitingRoom>
+      <div v-else class="state">
+        <p v-if="user.status === 'connecting'" class="boot-state" role="status">Verbinde mit Twitch …</p>
+        <p v-else-if="user.status === 'outside'">Öffne Stream Actions im Twitch-Kanal theshroomlife.</p>
+        <template v-else>
+          <p role="alert">Stream Actions ist gerade nicht erreichbar.</p>
+          <button type="button" class="button" @click="user.retry">Erneut verbinden</button>
+        </template>
+      </div>
+      <Memories v-if="user.status==='ready' && user.session" :token="user.session.user.jwtToken" />
     </main>
-    <main v-else>
-      <el-skeleton :animated="true" />
-    </main>
-  </el-container>
+  </div>
 </template>
 
-<style scoped>
-video {
-  height: 100%;
-  left: 0;
-  object-fit: cover;
-  pointer-events: none;
-  position: fixed;
-  top: 0;
-  width: 100%;
-  z-index: -1;
-}
-</style>
+

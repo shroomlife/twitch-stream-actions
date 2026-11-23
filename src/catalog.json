@@ -1,0 +1,82 @@
+[
+  {
+    "id": "pilz-wave",
+    "title": "Winken",
+    "group": "Pilz-GIFs"
+  },
+  {
+    "id": "pilz-heart",
+    "title": "Herz",
+    "group": "Pilz-GIFs"
+  },
+  {
+    "id": "pilz-party",
+    "title": "Party",
+    "group": "Pilz-GIFs"
+  },
+  {
+    "id": "pilz-psst",
+    "title": "Pssst!",
+    "group": "Pilz-GIFs"
+  },
+  {
+    "id": "pilz-sleep",
+    "title": "Schlafmütze",
+    "group": "Pilz-GIFs"
+  },
+  {
+    "id": "pilz-excited",
+    "title": "Jubel",
+    "group": "Pilz-GIFs"
+  },
+  {
+    "id": "pilz-hi",
+    "title": "Hi!",
+    "group": "Emotes"
+  },
+  {
+    "id": "pilz-hot",
+    "title": "Hot",
+    "group": "Emotes"
+  },
+  {
+    "id": "pilz-hype",
+    "title": "Hype",
+    "group": "Emotes"
+  },
+  {
+    "id": "pilz-love",
+    "title": "Liebe",
+    "group": "Emotes"
+  },
+  {
+    "id": "pilz-lul",
+    "title": "Lul",
+    "group": "Emotes"
+  },
+  {
+    "id": "pilz-pinata",
+    "title": "Piñata",
+    "group": "Emotes"
+  },
+  {
+    "id": "pilz-dj",
+    "title": "Pilz-DJ",
+    "group": "Sticker"
+  },
+  {
+    "id": "pilz-gift",
+    "title": "Geschenk",
+    "group": "Sticker"
+  },
+  {
+    "id": "pilz-crown",
+    "title": "Krönchen",
+    "group": "Sticker"
+  },
+  {
+    "id": "pilz-peek",
+    "title": "Kuckuck",
+    "group": "Sticker"
+  }
+]

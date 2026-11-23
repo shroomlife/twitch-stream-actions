@@ -1,352 +1,409 @@
 <script setup lang="ts">
-import type { IGif } from '@giphy/js-types'
-import { Icon } from '@iconify/vue';
-import { renderGrid, renderGif } from '@giphy/js-components'
-import { GiphyFetch, type GifsResult, type MediaType } from '@giphy/js-fetch-api'
-import { useUserStore } from '@/stores/userStore';
-import { computed, nextTick, onMounted, Ref, ref } from 'vue';
-import { ElNotification, ElButton, ElCard, ElInput, ElAlert, ElForm, ElOption, ElSelect } from 'element-plus';
-import { AddStreamGiphyRequestBody } from '@/types/global';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  ref,
+  shallowRef,
+  watch,
+} from 'vue'
+import { useUserStore } from '@/stores/userStore'
+import catalog from '@/catalog.json'
 import giphyMark from '@/assets/giphy-mark.gif'
 
-const userStore = useUserStore()
-
-const apiKey = String(import.meta.env.VITE_GIPHY_API_KEY)
-const $gf = new GiphyFetch(apiKey)
-
-const contentContainer: Ref<HTMLElement | null> = ref(null)
-const giphyGrid: Ref<HTMLElement | null> = ref(null)
-const giphyGridContainer: Ref<HTMLElement | null> = ref(null)
-
-const selectedGiphy: Ref<IGif | null> = ref(null)
-const selectedGiphyElement = ref<HTMLElement | null>(null)
-
-const aiPromptInput = ref<HTMLElement | null>(null)
-const messageInput = ref<HTMLElement | null>(null)
-
-const searchValue = ref('')
-const isLoading = ref(false)
-const isFetched = ref(false)
-const aiPrompt: Ref<string | null> = ref(null)
-const selectedGiphyMessage = ref('')
-
-const selectedGiphyType: Ref<MediaType> = ref('gifs')
-
-const loadedGiphys = ref<GifsResult | null>(null)
-
-const renderCounter = ref(0)
-
-const computedBoundingBox = computed(() => {
-  const innerWidth = giphyGridContainer.value?.clientWidth as number
-  return {
-    innerWidth,
-    amountOfColumns: Math.max(2, Math.ceil(innerWidth / 350)),
+type MediaType = 'gifs' | 'stickers'
+type Rendition = { url?: string; webp?: string }
+interface Gif {
+  id: string
+  title: string
+  alt_text?: string
+  url: string
+  images: {
+    fixed_width_small?: Rendition
+    fixed_width_small_still?: Rendition
+    fixed_width?: Rendition
+    fixed_width_still?: Rendition
+    original?: Rendition
   }
-})
+}
+interface GifPage {
+  data: Gif[]
+  pagination: { count: number; offset: number; total_count: number }
+}
 
-const handleSearch = async () => {
+const apiKey = import.meta.env.VITE_GIPHY_API_KEY
+const pageSize = 12
+const user = useUserStore()
+const mediaType = ref<MediaType>('gifs')
+const searchText = ref('')
+const searchTerm = ref('')
+const items = shallowRef<Gif[]>([])
+const offset = ref<number | null>(null)
+const loading = ref(false)
+const searchError = ref('')
+const selected = shallowRef<Gif | null>(null)
+const message = ref('')
+const source = ref<'pilze' | 'giphy'>('pilze')
+const groups = ['Pilz-GIFs', 'Emotes', 'Sticker']
+const group = ref(groups[0])
+const ownItems = computed<Gif[]>(() =>
+  catalog
+    .filter((item) => item.group === group.value)
+    .map((item) => {
+      const url = './pilze/' + item.id + '.webp'
+      const still =
+        item.group === 'Pilz-GIFs' ? './pilze/' + item.id + '-still.webp' : url
+      return {
+        id: item.id,
+        title: item.title,
+        url,
+        images: {
+          fixed_width: { url },
+          fixed_width_small: { url },
+          fixed_width_still: { url: still },
+          fixed_width_small_still: { url: still },
+        },
+      }
+    }),
+)
+const sending = ref(false)
+const sendError = ref('')
+const sent = ref(false)
+const seconds = ref(0)
+const previewTitle = ref<HTMLElement>()
+const browserTitle = ref<HTMLElement>()
+let selectedButton: HTMLButtonElement | undefined
+let searchRequest: AbortController | undefined
 
-  if (searchValue.value === '') {
-    await loadTrendingGifs()
-    return
+const canSend = computed(() => !sending.value && seconds.value === 0)
+
+watch(
+  () => user.cooldownUntil,
+  (deadline, _previous, onCleanup) => {
+    function update() {
+      seconds.value = Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
+      if (seconds.value === 0) clearInterval(timer)
+    }
+
+    // The label follows elapsed time even when the Twitch app suspends the panel.
+    const timer = deadline > Date.now() ? setInterval(update, 1000) : undefined
+    onCleanup(() => clearInterval(timer))
+    update()
+  },
+  { immediate: true },
+)
+
+function label(gif: Gif) {
+  return (
+    gif.alt_text ||
+    gif.title ||
+    (mediaType.value === 'gifs' ? 'GIF' : 'Sticker')
+  )
+}
+
+function preview(gif: Gif, large = false) {
+  const rendition = large
+    ? gif.images.fixed_width
+    : gif.images.fixed_width_small
+  return rendition?.webp || rendition?.url || gif.images.original?.url
+}
+
+async function loadPage(append = false) {
+  if (append && (offset.value === null || loading.value)) return
+  searchRequest?.abort()
+  const request = new AbortController()
+  searchRequest = request
+  if (!append) {
+    items.value = []
+    offset.value = null
   }
-  if (giphyGrid.value === null) return
-
-  isLoading.value = true
-  renderCounter.value++
-
-  const timeoutTimer = setTimeout(() => {
-    isLoading.value = false
-    ElNotification({
-      title: 'GIPHY Suche',
-      message: 'Die Suche dauert länger als erwartet. Bitte versuche es erneut.',
-      type: 'warning',
-    })
-  }, 5000)
-
-  renderGrid(
-    {
-      key: renderCounter.value,
-      width: giphyGridContainer.value?.clientWidth as number,
-      fetchGifs: async (offset: number) => {
-        loadedGiphys.value = await $gf.search(searchValue.value, { offset, type: selectedGiphyType.value })
-        return loadedGiphys.value
-      },
-      columns: computedBoundingBox.value.amountOfColumns,
-      gutter: 6,
-      user: {},
-      onGifClick: (gif: IGif, event: Event) => {
-        event.preventDefault()
-        handleGiphySelect(gif)
-        return false
-      },
-      onGifsFetched: () => {
-        isLoading.value = false
-        clearTimeout(timeoutTimer)
-      },
-    },
-    giphyGrid.value,
-  )
-}
-
-const loadTrendingGifs = async () => {
-  if (giphyGrid.value === null) return
-  isLoading.value = true
-  renderCounter.value++
-
-  const timeoutTimer = setTimeout(() => {
-    isLoading.value = false
-    ElNotification({
-      title: 'GIPHY Suche',
-      message: 'Die Suche dauert länger als erwartet. Bitte versuche es erneut.',
-      type: 'warning',
-    })
-  }, 5000)
-
-  renderGrid(
-    {
-      key: renderCounter.value,
-      width: giphyGridContainer.value?.clientWidth as number,
-      fetchGifs: async (offset: number) => {
-        loadedGiphys.value = await $gf.trending({ offset, type: selectedGiphyType.value })
-        return loadedGiphys.value
-      },
-      columns: computedBoundingBox.value.amountOfColumns,
-      gutter: 6,
-      user: {},
-      onGifClick: (gif: IGif, event: Event) => {
-        event.preventDefault()
-        handleGiphySelect(gif)
-        return false
-      },
-      onGifsFetched: () => {
-        isLoading.value = false
-        isFetched.value = true
-        clearTimeout(timeoutTimer)
-      },
-    },
-    giphyGrid.value,
-  )
-}
-
-const handleGiphySelect = async (gif: IGif) => {
-  selectedGiphy.value = gif
-  aiPrompt.value = null
-  await nextTick()
-  renderGif(
-    { gif, width: computedBoundingBox.value.innerWidth },
-    selectedGiphyElement.value as HTMLElement,
-  )
-}
-
-const handleSendGiphy = async () => {
-  await nextTick()
-  if (!selectedGiphy.value) return
-
-  isLoading.value = true
+  loading.value = true
+  searchError.value = ''
 
   try {
-    const giphyRequestBody = {
-      id: selectedGiphy.value.id,
-      title: selectedGiphy.value.title,
-      url: selectedGiphy.value.url,
-      userMessage: selectedGiphyMessage.value ?? undefined,
-      aiPrompt: aiPrompt.value ?? undefined,
-    } as AddStreamGiphyRequestBody
-    const sendGiphyResponse = await userStore.sendGiphy(giphyRequestBody)
-
-    if (sendGiphyResponse.success === true) {
-      selectedGiphy.value = null
-      selectedGiphyMessage.value = ''
-      searchValue.value = ''
-
-      userStore.setGiphyCooldown(60)
-
-      ElNotification({
-        title: 'GIPHY wird gesendet',
-        message: 'Dein GIPHY wird in den nächsten Sekunden erscheinen!',
-        type: 'success',
-      })
-
-      isLoading.value = false
+    if (!apiKey) throw new Error('GIPHY is not configured')
+    const endpoint = searchTerm.value ? 'search' : 'trending'
+    const url = new URL(
+      `https://api.giphy.com/v1/${mediaType.value}/${endpoint}`,
+    )
+    url.searchParams.set('api_key', apiKey)
+    url.searchParams.set('rating', 'g')
+    url.searchParams.set('limit', String(pageSize))
+    url.searchParams.set('offset', String(append ? offset.value : 0))
+    if (searchTerm.value) {
+      url.searchParams.set('q', searchTerm.value)
+      url.searchParams.set('lang', 'de')
     }
-    else {
-      isLoading.value = false
-      const errorMessage = sendGiphyResponse.error ?? 'Ein unbekannter Fehler ist aufgetreten.'
-      throw new Error(errorMessage)
-    }
-  }
-  catch (error: unknown) {
-    const errorMessage = (error as Error).message ?? 'Ein unbekannter Fehler ist aufgetreten.'
-    ElNotification({
-      title: 'Fehler beim Senden des GIPHY',
-      message: errorMessage,
-      type: 'error',
+    const response = await fetch(url, {
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(8000)]),
+      cache: 'no-store',
     })
-    isLoading.value = false
+    if (!response.ok) throw new Error('GIPHY request failed')
+    const page = (await response.json()) as GifPage
+    if (request.signal.aborted) return
+    const nextOffset = page.pagination.offset + page.pagination.count
+    offset.value =
+      page.pagination.count > 0 && nextOffset < page.pagination.total_count
+        ? nextOffset
+        : null
+    items.value = append ? [...items.value, ...page.data] : page.data
+  } catch {
+    if (!request.signal.aborted)
+      searchError.value = 'GIPHY ist gerade nicht erreichbar.'
+  } finally {
+    if (searchRequest === request) loading.value = false
   }
 }
 
-const computedHasSelectedGiphy = computed(() => selectedGiphy.value !== null)
+function search() {
+  searchTerm.value = searchText.value.trim()
+  void loadPage()
+}
 
-const computedSendGiphyIsReady = computed(() => {
-  let isReady = true
-  if (isLoading.value) isReady = false
-  if (!selectedGiphy.value) isReady = false
-  if (aiPrompt.value === null) isReady = true
-  if (aiPrompt.value !== null && String(aiPrompt.value).trim().length > 0 && String(aiPrompt.value).trim().length < 16) isReady = false
-  return isReady
-})
+function switchType(type: MediaType) {
+  if (type === mediaType.value) return
+  mediaType.value = type
+  search()
+}
 
-const focusAiPromptInput = () => {
-  if (aiPromptInput.value) {
-    aiPromptInput.value.focus()
+async function select(gif: Gif, event: MouseEvent) {
+  selectedButton = event.currentTarget as HTMLButtonElement
+  selected.value = gif
+  sent.value = false
+  sendError.value = ''
+  await nextTick()
+  previewTitle.value?.focus()
+}
+
+async function back() {
+  selected.value = null
+  message.value = ''
+  sendError.value = ''
+  await nextTick()
+  if (sent.value) browserTitle.value?.focus()
+  else selectedButton?.focus()
+}
+
+async function send() {
+  const gif = selected.value
+  if (!gif || !canSend.value) return
+  sending.value = true
+  sendError.value = ''
+  try {
+    const accepted = await user.sendGiphy({
+      id: gif.id,
+      title: gif.title,
+      url: gif.url,
+      userMessage: message.value.trim() || undefined,
+    })
+    if (!accepted) throw new Error('Senden ist gerade nicht möglich.')
+    sent.value = true
+    await back()
+  } catch (error) {
+    sendError.value =
+      error instanceof Error && error.name === 'Error'
+        ? error.message
+        : 'Das GIF konnte nicht gesendet werden.'
+  } finally {
+    sending.value = false
   }
 }
 
-const focusMessageInput = () => {
-  if (messageInput.value) {
-    messageInput.value.focus()
-  }
+function openSource(next: 'pilze' | 'giphy') {
+  source.value = next
+  if (next === 'giphy' && !items.value.length && !loading.value) void loadPage()
 }
-
-const handleDeslectGiphy = () => {
-  selectedGiphy.value = null
-  selectedGiphyMessage.value = ''
-  aiPrompt.value = null
-}
-
-onMounted(() => {
-  loadTrendingGifs()
-})
+onBeforeUnmount(() => searchRequest?.abort())
 </script>
 
 <template>
-
-  <el-card class="full-height-card h-100" body-class="h-100">
-
-    <div v-if="selectedGiphy" class="d-flex flex-column gap-3">
-      <div class="selected-gif">
-        <el-button v-if="!isLoading" circle size="large" type="primary" @click="handleDeslectGiphy">
-          <Icon icon="ph:x-bold" size="20" />
-        </el-button>
-        <div id="selectedGiphyElement" ref="selectedGiphyElement" />
+  <section class="giphy" aria-label="GIFs in den Stream schicken">
+    <div v-show="!selected" class="giphy-browser">
+      <div class="section-heading">
+        <h2 ref="browserTitle" tabindex="-1">Reaktion schicken</h2>
+        <img
+          v-if="source === 'giphy'"
+          class="giphy-mark"
+          :src="giphyMark"
+          alt="Powered by GIPHY"
+          width="102"
+          height="22"
+        />
       </div>
-      <el-form class="d-flex flex-column gap-3" @submit.prevent>
-        <div id="giphyDrawerMessageInput" class="d-flex flex-column gap-1">
-          <label for="messageInput">Deine Nachricht zum GIPHY</label>
-          <el-input id="messageInput" ref="messageInput" v-model="selectedGiphyMessage"
-            placeholder="Deine Nachricht zum GIPHY" :disabled="isLoading" :maxlength="128" size="large">
-            <template #prepend>
-              <Icon icon="ph:text" size="24" @click="focusMessageInput" />
-            </template>
-          </el-input>
+      <p v-if="sent" class="feedback success" role="status">
+        ✓ Reaktion zur automatischen Prüfung gesendet.
+      </p>
+      <p v-if="seconds" class="feedback">Nächstes GIF in {{ seconds }} s</p>
+      <div class="sources" role="group" aria-label="Sammlung">
+        <button
+          type="button"
+          :aria-pressed="source === 'pilze'"
+          @click="openSource('pilze')"
+        >
+          Unsere Pilze
+        </button>
+        <button
+          type="button"
+          :aria-pressed="source === 'giphy'"
+          @click="openSource('giphy')"
+        >
+          GIPHY
+        </button>
+      </div>
+      <div
+        v-if="source === 'pilze'"
+        class="picker-tabs"
+        role="group"
+        aria-label="Pilzsammlung"
+      >
+        <button
+          v-for="name in groups"
+          :key="name"
+          class="tab"
+          :aria-pressed="group === name"
+          @click="group = name"
+        >
+          {{ name }}
+        </button>
+      </div>
+      <form v-if="source === 'giphy'" class="search" @submit.prevent="search">
+        <input
+          v-model="searchText"
+          type="search"
+          maxlength="50"
+          aria-label="GIFs und Sticker suchen"
+          placeholder="GIFs und Sticker suchen"
+        />
+        <button type="submit" class="button primary">Suchen</button>
+      </form>
+      <div v-if="source === 'giphy'" class="picker-bar">
+        <div class="picker-tabs" role="group" aria-label="Medientyp">
+          <button
+            type="button"
+            class="tab"
+            :aria-pressed="mediaType === 'gifs'"
+            @click="switchType('gifs')"
+          >
+            GIFs
+          </button>
+          <button
+            type="button"
+            class="tab"
+            :aria-pressed="mediaType === 'stickers'"
+            @click="switchType('stickers')"
+          >
+            Sticker
+          </button>
         </div>
-        <div id="giphyDrawerAiPromptInput" class="d-flex flex-column gap-1">
-          <label for="aiPromptInput">Dein Prompt für den Sound zum GIPHY</label>
-          <div class="d-flex flex-column gap-1">
-            <el-input id="aiPromptInput" ref="aiPromptInput" v-model="aiPrompt"
-              placeholder="Dein Prompt für den Sound zum GIPHY" :disabled="isLoading" :maxlength="512" size="large">
-              <template #prepend>
-                <Icon icon="ph:robot" size="24" @click="focusAiPromptInput" />
-              </template>
-              <template v-if="!!aiPrompt" #append>
-                <el-button @click="aiPrompt = null">
-                  <Icon icon="ph:x-circle-fill" size="24" />
-                </el-button>
-              </template>
-            </el-input>
-
-            <div v-if="!aiPrompt" class="d-flex flex-wrap gap-1">
-              <el-button v-if="selectedGiphy.alt_text" @click="aiPrompt = selectedGiphy.alt_text">
-                GIPHY Alt Text (besser)
-              </el-button>
-              <el-button v-if="selectedGiphy.title" @click="aiPrompt = selectedGiphy.title">
-                GIPHY Titel (okay)
-              </el-button>
-              <el-button v-if="selectedGiphy.slug" @click="aiPrompt = selectedGiphy.slug">
-                GIPHY Slug (schlecht)
-              </el-button>
-            </div>
-          </div>
-          <template v-if="aiPrompt !== null && aiPrompt.length > 0">
-            <el-alert v-if="aiPrompt !== null && aiPrompt.length >= 16"
-              title="KI Sound Erstellung kann bis zu 10 Sekunden dauern." type="warning" size="small" show-icon
-              :closable="false" />
-            <el-alert v-else title="Gib mindestens 16 Zeichen ein!" type="error" show-icon :closable="false" />
-          </template>
-        </div>
-        <el-button id="giphyDrawerSendButton" size="large" type="primary" native-type="submit" :loading="isLoading"
-          :disabled="!computedSendGiphyIsReady" @click="handleSendGiphy">
-          Senden
-        </el-button>
-      </el-form>
+        <span class="eyebrow results-label">{{
+          searchTerm ? 'Suchergebnisse' : 'Im Trend'
+        }}</span>
+      </div>
+      <div class="gif-grid" :aria-busy="loading">
+        <button
+          v-for="gif in source === 'pilze' ? ownItems : items"
+          :key="gif.id"
+          type="button"
+          class="gif"
+          :class="{ collectible: source === 'pilze' }"
+          :aria-label="label(gif)"
+          @click="select(gif, $event)"
+        >
+          <picture v-if="preview(gif)">
+            <source
+              v-if="gif.images.fixed_width_small_still?.url"
+              media="(prefers-reduced-motion: reduce)"
+              :srcset="gif.images.fixed_width_small_still.url"
+            />
+            <img :src="preview(gif)" alt="" loading="lazy" decoding="async" />
+          </picture>
+          <span v-if="source === 'pilze' || !preview(gif)" class="tile-label">{{
+            label(gif)
+          }}</span>
+        </button>
+      </div>
+      <p v-if="source === 'giphy' && loading" class="feedback" role="status">
+        Lade {{ mediaType === 'gifs' ? 'GIFs' : 'Sticker' }} …
+      </p>
+      <div
+        v-else-if="source === 'giphy' && searchError"
+        class="state search-state"
+      >
+        <p class="feedback error" role="alert">{{ searchError }}</p>
+        <button
+          type="button"
+          class="button"
+          @click="loadPage(items.length > 0)"
+        >
+          Erneut versuchen
+        </button>
+      </div>
+      <p
+        v-else-if="source === 'giphy' && !items.length"
+        class="feedback"
+        role="status"
+      >
+        Keine Treffer gefunden.
+      </p>
+      <button
+        v-else-if="source === 'giphy' && offset !== null"
+        type="button"
+        class="button more"
+        @click="loadPage(true)"
+      >
+        Mehr anzeigen
+      </button>
     </div>
 
-    <div ref="giphyGridContainer" class="flex-column gap-3 h-100" :class="{
-      'd-none': computedHasSelectedGiphy,
-      'd-flex': !computedHasSelectedGiphy,
-    }">
-      <el-form class="d-flex gap-1" @submit.prevent>
-        <el-input v-model="searchValue" placeholder="Suche nach GIFs" :disabled="isLoading">
-          <template #prepend>
-            <el-select v-model="selectedGiphyType" placeholder="Typ" style="width: 100px;" @change="handleSearch">
-              <el-option label="GIFs" value="gifs" />
-              <el-option label="Sticker" value="stickers" />
-              <el-option label="Text" value="text" />
-              <el-option label="Videos" value="videos" />
-            </el-select>
-          </template>
-        </el-input>
-
-        <el-button type="primary" native-type="submit" :loading="isLoading" @click="handleSearch">
-          <Icon icon="ph:magnifying-glass" />
-        </el-button>
-      </el-form>
-      <div ref="contentContainer" class="content-container infinite-list flex-grow-1 rounded">
-        <div ref="giphyGrid" />
+    <form v-if="selected" class="giphy-preview" @submit.prevent="send">
+      <div class="section-heading">
+        <h2 ref="previewTitle" tabindex="-1">Vorschau</h2>
+        <img
+          v-if="source === 'giphy'"
+          class="giphy-mark"
+          :src="giphyMark"
+          alt="Powered by GIPHY"
+          width="102"
+          height="22"
+        />
       </div>
-      <div class="d-flex justify-content-end">
-        <img class="rounded" :src="giphyMark" alt="GIPHY Logo" />
+      <picture v-if="preview(selected, true)" class="preview-art">
+        <source
+          v-if="selected.images.fixed_width_still?.url"
+          media="(prefers-reduced-motion: reduce)"
+          :srcset="selected.images.fixed_width_still.url"
+        />
+        <img
+          :src="preview(selected, true)"
+          :alt="label(selected)"
+          decoding="async"
+        />
+      </picture>
+      <div class="extras">
+        <label for="gif-message"
+          >Nachricht an Robin <small>(optional)</small></label
+        >
+        <input
+          id="gif-message"
+          v-model="message"
+          placeholder="Was möchtest du Robin sagen?"
+          maxlength="128"
+          :disabled="sending"
+        />
       </div>
-    </div>
-
-  </el-card>
-
-
+      <p v-if="sendError" class="feedback error" role="alert">
+        {{ sendError }}
+      </p>
+      <p v-if="seconds" class="feedback">Nächstes GIF in {{ seconds }} s</p>
+      <div class="preview-actions">
+        <button type="button" class="button" :disabled="sending" @click="back">
+          Zurück
+        </button>
+        <button type="submit" class="button primary" :disabled="!canSend">
+          {{ sending ? 'Wird gesendet …' : 'In den Stream senden' }}
+        </button>
+      </div>
+    </form>
+  </section>
 </template>
 
-<style lang="scss" scoped>
-#selectedGiphyElement {
-  pointer-events: none;
-}
-
-.selected-gif {
-  position: relative;
-
-  button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 1;
-  }
-
-}
-
-.infinite-list {
-  padding: 0;
-  margin: 0;
-  list-style: none;
-
-  // hide scrollbar but stay scrollable
-  overflow-x: hidden;
-  overflow-y: scroll;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-
-  &::-webkit-scrollbar {
-    display: none;
-  }
-
-}
-</style>

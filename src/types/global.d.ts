@@ -1,91 +1,37 @@
-export type UserStoreState = {
-  isInitialized: boolean
-  currentUser: UserWithToken | null
-  lastUserCheckin: StreamCheckin | null
+export interface ExtensionAuthorization {
+  userId: string
+  token: string
 }
 
-export type AppStoreState = {
-  apiUrl: string
-  currentStream: Stream | null
+export interface TwitchExtensionAuthResponse {
+  user: {
+    id: string
+    owner: boolean
+    jwtToken: string
+    cooldowns: { giphy: number }
+  }
+  currentStream: { id: string } | null
 }
 
-export type StreamGiphyResponse = {
+export interface StreamGiphyResponse {
   success: boolean
-  giphy?: StreamGiphy
-  error?: string
-  leftInStream: number
+  error?: unknown
 }
 
-export type StreamGiphy = {
-  id: number
-  uuid: string
-  streamId: number
-  userId: number
-}
-
-export type User = {
-  id: number;
-  twitchId: string;
-  createdAt: Date;
-  uuid: string;
-  isActive: boolean;
-  twitchLogin: string;
-  twitchDisplayName: string;
-  twitchProfileImageUrl: string | null;
-  isPublic: boolean;
-}
-
-export type UserWithToken = User & {
-  jwtToken: string
-  cooldowns: ActionCooldowns
-}
-
-export type Stream = {
-  id: number
-  twitchId: string
-  title: string
-  streamNumber: number
-}
-
-export type StreamCheckin = {
-  id: number
-  streamId: number
-  userId: number
-  isActive: boolean
-  createdAt: Date
-}
-
-export type StreamCheckinResponse = {
-  success: boolean
-  checkin: StreamCheckin | null
-}
-
-export type TwitchExtensionAuthResponse = {
-  user: UserWithToken
-  currentStream: Stream | null
-  lastUserCheckin: StreamCheckin | null
-}
-
-export interface ActionCooldowns {
-  giphy: number
-}
-
-export type AddStreamGiphyRequestBody = {
+export interface AddStreamGiphyRequestBody {
   id: string
   url: string
   title: string
   userMessage?: string
-  aiPrompt?: string
 }
 
 declare global {
   interface Window {
-    Twitch: {
-      ext: {
-        onAuthorized: (callback: (auth: { userId: string, token: string }) => void) => void
-        actions: {
-          requestIdShare: () => void
-        }
+    Twitch?: {
+      ext?: {
+        viewer: { id: string | null; isLinked: boolean }
+        onAuthorized: (callback: (auth: ExtensionAuthorization) => void) => void
+        actions: { requestIdShare: () => void }
       }
     }
   }

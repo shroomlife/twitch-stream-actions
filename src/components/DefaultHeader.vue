@@ -1,23 +1,16 @@
 <script setup lang="ts">
-import { useUserStore } from '@/stores/userStore';
-import { ElAvatar, ElHeader } from 'element-plus';
-const userStore = useUserStore();
+import mascot from '@/assets/shroomie-wave.webp'
+
+defineProps<{ live: boolean }>()
 </script>
 
 <template>
-  <el-header class="d-flex justify-content-between align-items-center">
-    <span>shroomlive Stream Actions</span>
-    <el-avatar
-        v-if="userStore.getHasUser"
-        :src="userStore.getUserProfileImageUrl"
-        :size="32"
-      />
-  </el-header>
+  <header class="masthead">
+    <div class="masthead-copy">
+      <p class="eyebrow">shroomlive</p>
+      <h1>Stream Actions</h1>
+      <span v-if="live" class="live">Live</span>
+    </div>
+    <img :src="mascot" alt="" width="88" height="88" />
+  </header>
 </template>
-
-<style lang="scss" scoped>
-span {
-  font-size: 1rem;
-  font-weight: 600
-}
-</style>
