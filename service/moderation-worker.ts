@@ -1,22 +1,59 @@
-import { createHmac } from 'node:crypto'
-import {moderate,askRobin} from './moderate'
-const secret=await Bun.secrets.get({service:'stream-control',name:'twitch-extension-secret'})
-if(!secret)throw Error('Desktop credential missing')
-const key=createHmac('sha256',Buffer.from(secret,'base64')).update('stream-actions/desktop-worker/v1').digest('hex')
-async function request(body:object) {
-  const r=await fetch('https://shroomlive.de/stream-actions/desktop-job',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(30000)})
-  if(!r.ok)throw Error('Worker unavailable')
-  return r.json()
+// Desktop worker, started by desktop-display.cjs. Talks to the service over the authenticated desktop channel.
+// stdin: one command per line (auto-approve switch, removal). stdout: one queue snapshot per line for the tray menu.
+import { createInterface } from 'node:readline'
+import { loadDesktopKey } from './desktop-credential'
+import { createWorker, parseCommand } from './desktop-worker-core'
+import { askRobin, moderate } from './moderate'
+import { publicBaseUrl } from './public-url'
+
+const key = await loadDesktopKey()
+const endpoint = publicBaseUrl() + '/stream-actions/desktop-job'
+const retryMs = 3000
+
+async function request(body: Record<string, unknown>): Promise<unknown> {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000),
+  })
+  if (!res.ok) throw Error('Worker unavailable (' + res.status + ')')
+  return res.json()
 }
-async function work(queue:'pending'|'held'){
-  for(;;){
-    try{
-      const {item}=await request({queue,action:'next'})
-      if(!item)continue
-      const reason=queue==='pending'?await moderate(item):item.reason
-      const action=queue==='held'?(await askRobin(item,reason)?'ready':'rejected'):(reason?'held':'ready')
-      await request({queue,id:item.id,action,reason})
-    }catch{await Bun.sleep(3000)}
+
+// Repeats a step for as long as the worker runs; a failure waits before the next try.
+async function forever(step: () => Promise<void>) {
+  for (;;) {
+    try {
+      await step()
+    } catch {
+      await Bun.sleep(retryMs)
+    }
   }
 }
-await Promise.all([work('pending'),work('held')])
+
+async function untilDone(body: Record<string, unknown>) {
+  for (;;) {
+    try {
+      return await request(body)
+    } catch {
+      await Bun.sleep(retryMs)
+    }
+  }
+}
+
+const worker = createWorker({ request, moderate, askRobin })
+let since = ''
+async function watchQueue() {
+  const snapshot = await request({ action: 'queue', since })
+  since = JSON.stringify(snapshot)
+  process.stdout.write(JSON.stringify({ type: 'queue', snapshot }) + '\n')
+}
+
+createInterface({ input: process.stdin }).on('line', (line) => {
+  const command = parseCommand(line)
+  if (command?.type === 'auto-approve') void untilDone({ action: 'settings', autoApprove: command.value })
+  else if (command?.type === 'remove') void untilDone({ action: 'remove', id: command.id })
+})
+
+await Promise.all([forever(worker.pendingStep), forever(worker.heldStep), forever(watchQueue)])
