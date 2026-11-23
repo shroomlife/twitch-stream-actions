@@ -2,7 +2,7 @@
 // the reaction on screen and the waiting ones. The worker process carries every change to the service.
 const path = require('node:path')
 const fs = require('node:fs')
-const catalog = require('../src/catalog.json')
+const catalog = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'src', 'catalog.json'), 'utf8'))
 
 const stateLabels = { pending: 'wird geprüft', held: 'wartet auf dich', ready: 'freigegeben' }
 const motifName = (media) => catalog.find((item) => item.id === media)?.title ?? 'GIPHY'
