@@ -22,7 +22,7 @@ test('a GIF first painted nine seconds into its slot gets a fresh capture deadli
   const electron={app,BrowserWindow:Window,ipcMain:ipc,screen:{on(){},getPrimaryDisplay:()=>({bounds:{width:1920,height:1080,x:0,y:0}})}}
   runInNewContext(await readFile(join(import.meta.dir,'desktop-display.cjs'),'utf8'),{
     __dirname:import.meta.dir,Date:{now:()=>now},setTimeout:()=>0,clearTimeout(){},
-    require:(id:string)=>id==='electron'?electron:id==='node:child_process'?{spawn}:require(id)
+    require:(id:string)=>id==='electron'?electron:id==='node:child_process'?{spawn}:id==='./desktop-control.cjs'?{startControl(){}}:require(id)
   })
   await Promise.resolve()
   for(const until of [now-1,now+1000,now+1000])ipc.emit('reaction-visible',{sender},{id:42,until,local:false})
@@ -72,7 +72,7 @@ async function stripDisplay(){
   const electron={app,BrowserWindow:Window,ipcMain:ipc,screen:{on(){},getPrimaryDisplay:()=>({bounds:{width:1920,height:1080,x:0,y:0}})}}
   runInNewContext(await readFile(join(import.meta.dir,'desktop-display.cjs'),'utf8'),{
     __dirname:import.meta.dir,Date:{now:()=>now},setTimeout:clock.setTimeout,clearTimeout:clock.clearTimeout,
-    require:(id:string)=>id==='electron'?electron:id==='node:child_process'?{spawn}:require(id)
+    require:(id:string)=>id==='electron'?electron:id==='node:child_process'?{spawn}:id==='./desktop-control.cjs'?{startControl(){}}:require(id)
   })
   await Promise.resolve()
   const sender=windows[0].webContents

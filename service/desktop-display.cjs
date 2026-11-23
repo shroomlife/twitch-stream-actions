@@ -4,8 +4,11 @@ app.setPath('userData', path.join(app.getPath('appData'), 'shroomlive-reaction-d
 if (!app.requestSingleInstanceLock()) app.quit()
 else app.whenReady().then(() => {
   const {spawn}=require('node:child_process')
-  const worker=spawn('bun',['--env-file=.env.production','service/moderation-worker.ts'],{cwd:path.join(__dirname,'..'),windowsHide:true,stdio:'ignore'})
+  const worker=spawn('bun',['--env-file=.env.production','service/moderation-worker.ts'],{cwd:path.join(__dirname,'..'),windowsHide:true,stdio:['pipe','pipe','ignore']})
+  worker.stdin.on('error',()=>{})
   app.once('will-quit',()=>worker.kill())
+  // Tray: auto-approve switch and removal of the visible or waiting reactions.
+  require('./desktop-control.cjs').startControl({electron:require('electron'),worker,settingsFile:path.join(app.getPath('userData'),'settings.json')})
   function bounds() {
     const b = screen.getPrimaryDisplay().bounds
     const width = Math.round(Math.min(b.width * .46, b.height * 1.2))
