@@ -110,6 +110,7 @@ export function createApp(options: AppOptions) {
     if (!streams.applyEventSub(id, timestamp)) return
     endActive()
     publish()
+    signalJobs()
     hub.broadcast('event: stream-status\ndata: changed\n\n')
   }
 
