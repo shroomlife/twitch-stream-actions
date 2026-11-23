@@ -16,3 +16,9 @@ Build the runtime image from the repository root with `docker build -f service/D
 
 The SQLite database holds per-stream submissions. The service accepts one submission per viewer and up to three per channel per minute. The review list expires entries after ten minutes. On submission, it prunes submission records older than one day. The active overlay is transient. The public frontend contains the GIPHY client key used for direct media searches and lookups.
 
+
+## Reaction memories
+
+While a reaction is visible, the capture-protected desktop display takes three webcam frames from the OBS source "Webcam" at 1.2, 2.2 and 3.2 seconds, at least one second apart and never later than five seconds after the first paint. Each shot is preceded by a private white flash for Robin. The frames go to `POST /stream-actions/camera/<id>/<frame>` and are stored per viewer next to a small note with the motif id. GIPHY media itself is never stored or proxied by the service ([GIPHY API: prohibited integration practices](https://developers.giphy.com/docs/api/)).
+
+The panel shows the memory as an animated card: the motif plays straight from GIPHY (or the bundled mushroom), Robin's frames take turns above a small film strip, and GIPHY motifs carry the official "Powered by GIPHY" mark on a Neon-Myzel plate plus the creator's name where GIPHY provides one. "Als PNG speichern" builds a PNG in the viewer's browser with frame 1, a still of the motif and, for GIPHY, the same mark.
