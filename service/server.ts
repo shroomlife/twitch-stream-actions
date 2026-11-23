@@ -5,15 +5,11 @@ import {listMemories,readFrame,saveMemory,validFrame,validKey} from './memories'
 import {dirname,join} from 'node:path'
 const memoryRoot=join(dirname(process.env.ACTIONS_DB||'stream-actions.sqlite'),'reaction-photos')
 import catalog from '../src/catalog.json'
+import { loadSecrets } from './config'
 
 const channel = '137290088'
-const secret = Buffer.from(process.env.TWITCH_EXTENSION_SECRET || '', 'base64')
-const clientId = process.env.TWITCH_CLIENT_ID
-const clientSecret = process.env.TWITCH_CLIENT_SECRET
-if (secret.length < 16 || !clientId || !clientSecret)
-  throw Error(
-    'Configure Twitch extension signing secret and Helix application credentials',
-  )
+// Read once at start; fails fast with the names of missing secrets, never their values.
+const { extensionSecret: secret, clientId, clientSecret } = loadSecrets(process.env)
 const db = new Database(process.env.ACTIONS_DB || 'stream-actions.sqlite', {
   create: true,
 })
@@ -80,8 +76,8 @@ async function token() {
     const res = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
       body: new URLSearchParams({
-        client_id: clientId!,
-        client_secret: clientSecret!,
+        client_id: clientId,
+        client_secret: clientSecret,
         grant_type: 'client_credentials',
       }),
       signal: AbortSignal.timeout(5000),
@@ -101,7 +97,7 @@ async function token() {
 async function helix(path: string) {
   const res = await fetch('https://api.twitch.tv/helix/' + path, {
     headers: {
-      'Client-Id': clientId!,
+      'Client-Id': clientId,
       Authorization: 'Bearer ' + (await token()),
     },
     signal: AbortSignal.timeout(5000),
