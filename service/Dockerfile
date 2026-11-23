@@ -1,6 +1,5 @@
 FROM oven/bun:1.4.4
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends imagemagick fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --chown=bun:bun service/server.ts service/stream-status.ts service/memories.ts ./service/
 COPY --chown=bun:bun src/catalog.json ./src/catalog.json

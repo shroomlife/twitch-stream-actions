@@ -13,34 +13,58 @@ else app.whenReady().then(() => {
     return { width, height, x: Math.round(b.x + b.width*.66 - width/2), y: Math.round(b.y + (b.height-height)/2) }
   }
   const win = new BrowserWindow({...bounds(), title:'shroomlive Reaktionen', show:false, frame:false, transparent:true, focusable:false, skipTaskbar:true, hasShadow:false, webPreferences:{preload:path.join(__dirname,"display-preload.cjs"),sandbox:true, contextIsolation:true, backgroundThrottling:false}})
-  let lastId, pending
-  ipcMain.on('reaction-visible', (event,{id,until,local})=>{
+  // Photo strip: three shots in the first seconds the reaction is on screen, each announced by a private flash.
+  const shotDelays=[1200,2200,3200]
+  let lastId, stopShots=()=>{}
+  ipcMain.on('reaction-visible', (event,{id,until,local,media})=>{
     if(event.sender!==win.webContents || !Number.isFinite(until) || until<=Date.now() || until>Date.now()+10500) return
-    if(local ? !/^\d{13}-[0-9a-f-]{36}$/.test(id) : !Number.isSafeInteger(id)) return
+    if(local ? !/^\d{13}-[0-9a-f-]{36}$/.test(id) || !/^[A-Za-z0-9-]{1,80}$/.test(media) : !Number.isSafeInteger(id)) return
     if(id===lastId)return
     lastId=id
-    clearTimeout(pending)
+    stopShots()
     const visibleAt=Date.now()
     const captureDeadline=visibleAt+5000
     const proc=spawn('bun',['service/reaction-camera.ts'],{cwd:path.join(__dirname,'..'),windowsHide:true,stdio:['pipe','pipe','ignore']})
     proc.stdin.on('error',()=>{})
     proc.on('error',()=>{})
-    proc.stdin.write(JSON.stringify({id,until:captureDeadline,local})+'\n')
+    proc.stdin.write(JSON.stringify({id,until:captureDeadline,local,media:local?media:undefined})+'\n')
     const stop=setTimeout(()=>proc.kill(),15000)
     proc.once('close',()=>clearTimeout(stop))
+    let taken=0, finished=false, pending
+    // Without a frame the helper is dropped; after one, closing stdin lets taken frames finish uploading.
+    function finish(){
+      if(finished)return
+      finished=true
+      clearTimeout(pending)
+      if(taken)proc.stdin.end();else proc.kill()
+    }
+    stopShots=finish
     proc.stdout.once('data',()=>{
-      if(id!==lastId || Date.now()>captureDeadline-400){proc.kill();return}
+      if(finished || Date.now()>captureDeadline-400){finish();return}
       const flash=new BrowserWindow({...screen.getPrimaryDisplay().bounds,frame:false,show:false,focusable:false,skipTaskbar:true,backgroundColor:'#ffffff',opacity:0.65})
       flash.setContentProtection(true)
       flash.setIgnoreMouseEvents(true)
       flash.setAlwaysOnTop(true,'screen-saver')
       proc.once('close',()=>{if(!flash.isDestroyed())flash.destroy()})
-      pending=setTimeout(()=>{
-        if(id!==lastId || Date.now()>captureDeadline-400){proc.kill();return}
-        flash.showInactive()
-        setTimeout(()=>{if(id===lastId)proc.stdin.end('capture\n');else proc.kill()},85)
-        setTimeout(()=>{if(!flash.isDestroyed())flash.destroy()},350)
-      },Math.max(0,visibleAt+1200-Date.now()))
+      // A late helper must not bunch the shots: keep at least a second between two frames.
+      let lastShot=-Infinity
+      function shoot(){
+        const at=Math.max(visibleAt+shotDelays[taken],lastShot+1000)
+        if(at>captureDeadline-400){finish();return}
+        pending=setTimeout(()=>{
+          if(finished || Date.now()>captureDeadline-400){finish();return}
+          lastShot=Date.now()
+          flash.showInactive()
+          pending=setTimeout(()=>{
+            if(finished)return
+            taken++
+            proc.stdin.write('capture '+taken+'\n')
+            if(taken===shotDelays.length)finish();else shoot()
+          },85)
+          setTimeout(()=>{if(!flash.isDestroyed())flash.hide()},350)
+        },Math.max(0,at-Date.now()))
+      }
+      shoot()
     })
   })
   win.setContentProtection(true)

@@ -1,7 +1,7 @@
 import { receiveStreamStatus, webhookSecret } from './stream-status'
 import { Database } from 'bun:sqlite'
 import { createHmac, timingSafeEqual } from 'node:crypto'
-import {listMemories,renderMemory,saveMemory,sizes,validKey,type Format} from './memories'
+import {listMemories,readFrame,saveMemory,validFrame,validKey} from './memories'
 import {dirname,join} from 'node:path'
 const memoryRoot=join(dirname(process.env.ACTIONS_DB||'stream-actions.sqlite'),'reaction-photos')
 import catalog from '../src/catalog.json'
@@ -234,14 +234,15 @@ export const server = Bun.serve({
         const credential=Buffer.from(req.headers.get('authorization')||'')
         const expected=Buffer.from('Bearer '+desktopKey)
         if(credential.length!==expected.length || !timingSafeEqual(credential,expected))return json({},403)
-        const match=/^camera\/([1-9]\d*)$/.exec(route)
-        if(!match || req.headers.get('content-type')!=='image/jpeg')return json({},400)
+        const match=/^camera\/([1-9]\d*)\/([1-9])$/.exec(route)
+        const frame=Number(match?.[2])
+        if(!match || !validFrame(frame) || req.headers.get('content-type')!=='image/jpeg')return json({},400)
         const id=Number(match[1])
-        const row=db.query<{viewer:string;created:number},[number,number]>("SELECT viewer,created FROM requests WHERE id=? AND state='shown' AND shown_at>?").get(id,Date.now()-60000)
+        const row=db.query<{viewer:string;created:number;media:string},[number,number]>("SELECT viewer,created,media FROM requests WHERE id=? AND state='shown' AND shown_at>?").get(id,Date.now()-60000)
         if(!row)return json({},404)
         const suffix=createHmac('sha256',secret).update('photo/'+row.created+'/'+id).digest('hex').slice(0,32)
         const key=row.created+'-'+suffix.slice(0,8)+'-'+suffix.slice(8,12)+'-'+suffix.slice(12,16)+'-'+suffix.slice(16,20)+'-'+suffix.slice(20)
-        await saveMemory(memoryRoot,row.viewer,key,new Uint8Array(await req.arrayBuffer()))
+        await saveMemory(memoryRoot,row.viewer,key,frame,row.media,new Uint8Array(await req.arrayBuffer()))
         signalJobs()
         return json({success:true})
       }
@@ -302,8 +303,8 @@ export const server = Bun.serve({
       )
       if(route==='memories' || route==='memory'){
         if(route==='memory'){
-          if(!validKey(body.key)||!Object.hasOwn(sizes,body.format))return json({},400)
-          const image=await renderMemory(memoryRoot,viewer.id,body.key,body.format as Format)
+          if(!validKey(body.key)||!validFrame(body.frame))return json({},400)
+          const image=await readFrame(memoryRoot,viewer.id,body.key,body.frame)
           return image?new Response(new Uint8Array(image),{headers:{...cors,'Content-Type':'image/jpeg'}}):json({},404)
         }
         const read=async()=>({photos:await listMemories(memoryRoot,viewer.id),latest:db.query("SELECT state,created,shown_at FROM requests WHERE viewer=? ORDER BY id DESC LIMIT 1").get(viewer.id)})

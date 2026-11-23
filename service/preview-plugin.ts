@@ -58,7 +58,7 @@ export function localObsTest(): Plugin {
             res.setHeader('Cache-Control','no-store')
             if(url.pathname==='/test-memory'){
               if(typeof body.key!=='string'||!body.key)throw Error()
-              const img=await localPhoto({key:body.key,format:body.format})
+              const img=await localPhoto({key:body.key,frame:body.frame})
               res.setHeader('Content-Type','image/jpeg');res.end(img);return
             }
             const read=async()=>JSON.stringify({photos:JSON.parse((await localPhoto({})).toString()),latest})

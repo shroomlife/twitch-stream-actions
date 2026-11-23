@@ -8,8 +8,8 @@ async function paint(entry:PhotoEntry|null,local:boolean) {
   if(painted && entry && new URLSearchParams(location.search).get('display')==='desktop') {
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
       if (revision !== paintRevision || Date.now() >= entry.until) return
-      const bridge=(window as Window & {reactionCamera?:{visible:(id:number|string,until:number,local:boolean)=>void}}).reactionCamera
-      bridge?.visible(entry.id,entry.until,local)
+      const bridge=(window as Window & {reactionCamera?:{visible:(id:number|string,until:number,local:boolean,media:string)=>void}}).reactionCamera
+      bridge?.visible(entry.id,entry.until,local,entry.media)
     }))
   }
   return painted
