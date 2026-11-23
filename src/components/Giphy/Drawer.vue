@@ -10,6 +10,7 @@ import {
 import { useUserStore } from '@/stores/userStore'
 import catalog from '@/catalog.json'
 import giphyMark from '@/assets/giphy-mark.gif'
+import { giphyApiOrigin, giphyMediaUrl } from '@/media-hosts'
 
 type MediaType = 'gifs' | 'stickers'
 type Rendition = { url?: string; webp?: string }
@@ -101,11 +102,19 @@ function label(gif: Gif) {
   )
 }
 
-function preview(gif: Gif, large = false) {
-  const rendition = large
-    ? gif.images.fixed_width
-    : gif.images.fixed_width_small
-  return rendition?.webp || rendition?.url || gif.images.original?.url
+// Grid tiles show the still frame (light on mobile data); only the chosen motif animates in the preview.
+// Our own mushrooms are bundled files; GIPHY URLs are used as GIPHY sent them and only from allowlisted hosts.
+const mediaUrl = (value: string | undefined) => (source.value === 'pilze' ? value || null : giphyMediaUrl(value))
+function tile(gif: Gif) {
+  const still = gif.images.fixed_width_small_still
+  return mediaUrl(still?.webp) ?? mediaUrl(still?.url)
+}
+function preview(gif: Gif) {
+  const rendition = gif.images.fixed_width
+  return mediaUrl(rendition?.webp) ?? mediaUrl(rendition?.url) ?? mediaUrl(gif.images.original?.url)
+}
+function previewStill(gif: Gif) {
+  return mediaUrl(gif.images.fixed_width_still?.url)
 }
 
 async function loadPage(append = false) {
@@ -124,7 +133,7 @@ async function loadPage(append = false) {
     if (!apiKey) throw new Error('GIPHY is not configured')
     const endpoint = searchTerm.value ? 'search' : 'trending'
     const url = new URL(
-      `https://api.giphy.com/v1/${mediaType.value}/${endpoint}`,
+      `${giphyApiOrigin}/v1/${mediaType.value}/${endpoint}`,
     )
     url.searchParams.set('api_key', apiKey)
     url.searchParams.set('rating', 'g')
@@ -231,7 +240,7 @@ onBeforeUnmount(() => searchRequest?.abort())
         />
       </div>
       <p v-if="sent" class="feedback success" role="status">
-        ✓ Reaktion zur automatischen Prüfung gesendet.
+        ✓ Reaktion zur Prüfung gesendet.
       </p>
       <p v-if="seconds" class="feedback">Nächstes GIF in {{ seconds }} s</p>
       <div class="sources" role="group" aria-label="Sammlung">
@@ -309,15 +318,8 @@ onBeforeUnmount(() => searchRequest?.abort())
           :aria-label="label(gif)"
           @click="select(gif, $event)"
         >
-          <picture v-if="preview(gif)">
-            <source
-              v-if="gif.images.fixed_width_small_still?.url"
-              media="(prefers-reduced-motion: reduce)"
-              :srcset="gif.images.fixed_width_small_still.url"
-            />
-            <img :src="preview(gif)" alt="" loading="lazy" decoding="async" />
-          </picture>
-          <span v-if="source === 'pilze' || !preview(gif)" class="tile-label">{{
+          <img v-if="tile(gif)" :src="tile(gif) ?? undefined" alt="" loading="lazy" decoding="async" />
+          <span v-if="source === 'pilze' || !tile(gif)" class="tile-label">{{
             label(gif)
           }}</span>
         </button>
@@ -367,14 +369,14 @@ onBeforeUnmount(() => searchRequest?.abort())
           height="22"
         />
       </div>
-      <picture v-if="preview(selected, true)" class="preview-art">
+      <picture v-if="preview(selected)" class="preview-art">
         <source
-          v-if="selected.images.fixed_width_still?.url"
+          v-if="previewStill(selected)"
           media="(prefers-reduced-motion: reduce)"
-          :srcset="selected.images.fixed_width_still.url"
+          :srcset="previewStill(selected) ?? undefined"
         />
         <img
-          :src="preview(selected, true)"
+          :src="preview(selected) ?? undefined"
           :alt="label(selected)"
           decoding="async"
         />
