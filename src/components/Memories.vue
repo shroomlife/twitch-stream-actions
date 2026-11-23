@@ -1,17 +1,29 @@
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import markDark from '@/assets/giphy-mark-dark.png'
 import { lookupMotif, type Motif } from '@/media'
-import { isPngFormat, stripPlan, type MemoryEntry } from '@/memory-card'
-import { renderMemoryPng } from '@/memory-png'
+import { frameCacheKey, missingFrames, stripPlan, type MemoryEntry } from '@/memory-card'
 
-const props = defineProps<{ token: string }>()
+// The viewer decides which album is shown; a refreshed token for the same viewer neither restarts the album nor reloads frames.
+const props = defineProps<{ viewer: string; token: string }>()
 const photos = ref<MemoryEntry[]>([]), selected = ref(''), status = ref(''), error = ref('')
-const frameUrls = ref<string[]>([]), motif = ref<Motif | null>(null), format = ref('square'), saving = ref(false)
+const motif = ref<Motif | null>(null)
+const frameCache = reactive(new Map<string, string>())
 const current = computed(() => photos.value.find((memory) => memory.key === selected.value) ?? null)
 const plan = computed(() => (current.value ? stripPlan(current.value) : null))
-let firstFrame: Blob | null = null
-const labels: Record<string, string> = { pending: 'Deine Reaktion wird geprüft.', held: 'Robin sieht deine Reaktion zur Entscheidung.', ready: 'Deine Reaktion ist als Nächstes in der Warteschlange.', shown: 'Deine Reaktion wurde zur Einblendung gesendet.', rejected: 'Diese Reaktion wurde verworfen.', expired: 'Diese Reaktion ist abgelaufen.' }
+const frameUrls = computed(() => {
+  const memory = current.value
+  if (!memory || !plan.value) return []
+  const urls: string[] = []
+  // Only an unbroken run from frame 1 is shown, so the strip never has a gap.
+  for (const frame of plan.value.frames) {
+    const url = frameCache.get(frameCacheKey(memory.key, frame))
+    if (!url) break
+    urls.push(url)
+  }
+  return urls
+})
+const labels: Record<string, string> = { pending: 'Deine Reaktion wird geprüft.', held: 'Robin sieht deine Reaktion zur Entscheidung.', ready: 'Deine Reaktion ist als Nächstes in der Warteschlange.', shown: 'Deine Reaktion wurde zur Einblendung gesendet.', rejected: 'Diese Reaktion wurde verworfen.', expired: 'Diese Reaktion ist abgelaufen.', removed: 'Robin hat diese Reaktion entfernt.' }
 
 async function call(path: string, body: object, signal?: AbortSignal) {
   const r = await fetch(new URL('/stream-actions/' + path, import.meta.env.VITE_API_URL), { method: 'POST', headers: { Authorization: 'Bearer ' + props.token, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal })
@@ -25,12 +37,17 @@ function isMemory(value: unknown): value is MemoryEntry {
     && 'media' in value && (value.media === null || typeof value.media === 'string')
 }
 
-watch(() => props.token, async (token, _, cleanup) => {
+function releaseFrames(keep: (key: string) => boolean = () => false) {
+  for (const [key, url] of frameCache) if (!keep(key)) { URL.revokeObjectURL(url); frameCache.delete(key) }
+}
+
+watch(() => props.viewer, async (viewer, _, cleanup) => {
   const controller = new AbortController()
   cleanup(() => controller.abort())
   let since = ''
   photos.value = []; selected.value = ''; status.value = ''
-  while (!controller.signal.aborted && token) {
+  releaseFrames()
+  while (!controller.signal.aborted && viewer) {
     try {
       const data = await (await call('memories', { since }, controller.signal)).json()
       if (controller.signal.aborted) return
@@ -39,6 +56,8 @@ watch(() => props.token, async (token, _, cleanup) => {
       // A strip grows while its frames arrive; keep the choice unless a newer memory appeared.
       if (list[0]?.key !== photos.value[0]?.key) selected.value = list[0]?.key ?? ''
       photos.value = list
+      const keys = new Set(list.map((memory) => memory.key))
+      releaseFrames((key) => keys.has(key.slice(0, key.lastIndexOf('/'))))
       const latest = data.latest
       status.value = latest && Date.now() - latest.created < 600000 ? labels[latest.state] || '' : ''
       if (latest?.state === 'shown' && Date.now() - (latest.shown_at ?? latest.created) > 60000) status.value = 'Für diese Einblendung ist kein Kamerafoto eingegangen.'
@@ -52,25 +71,21 @@ watch(() => props.token, async (token, _, cleanup) => {
   }
 }, { immediate: true })
 
-function releaseFrames() {
-  for (const url of frameUrls.value) URL.revokeObjectURL(url)
-  frameUrls.value = []
-  firstFrame = null
-}
-// Reload when another frame of the same strip arrives, not on every poll.
+// Loads only the frames of the chosen strip that are not cached yet.
 watch(() => current.value && current.value.key + '/' + current.value.frames, async (_, __, cleanup) => {
   const controller = new AbortController()
   cleanup(() => controller.abort())
   const memory = current.value
-  releaseFrames()
   if (!memory) return
   try {
-    const blobs = await Promise.all(stripPlan(memory).frames.map(async (frame) => (await call('memory', { key: memory.key, frame }, controller.signal)).blob()))
+    const missing = missingFrames(memory, new Set(frameCache.keys()))
+    const blobs = await Promise.all(missing.map(async (frame) => (await call('memory', { key: memory.key, frame }, controller.signal)).blob()))
     if (controller.signal.aborted) return
-    firstFrame = blobs[0] ?? null
-    frameUrls.value = blobs.map((blob) => URL.createObjectURL(blob))
+    missing.forEach((frame, index) => frameCache.set(frameCacheKey(memory.key, frame), URL.createObjectURL(blobs[index])))
   } catch { if (!controller.signal.aborted) error.value = 'Foto konnte nicht geladen werden.' }
 }, { immediate: true })
+
+// Our own mushrooms come from the bundle; a GIPHY is looked up live by its id and hotlinked from GIPHY.
 watch(() => current.value?.media ?? null, async (media, _, cleanup) => {
   const controller = new AbortController()
   cleanup(() => controller.abort())
@@ -81,19 +96,7 @@ watch(() => current.value?.media ?? null, async (media, _, cleanup) => {
     if (!controller.signal.aborted) motif.value = found
   } catch { /* The strip stays useful without its motif. */ }
 }, { immediate: true })
-onBeforeUnmount(releaseFrames)
-
-async function download() {
-  const memory = current.value
-  if (!memory || !firstFrame || !isPngFormat(format.value)) return
-  saving.value = true
-  try {
-    const blob = await renderMemoryPng(memory, format.value, firstFrame, AbortSignal.timeout(15000))
-    const url = URL.createObjectURL(blob), a = document.createElement('a')
-    a.href = url; a.download = 'shroomlive-' + memory.key.slice(0, 13) + '-' + format.value + '.png'
-    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000)
-  } catch { error.value = 'Download fehlgeschlagen.' } finally { saving.value = false }
-}
+onBeforeUnmount(() => releaseFrames())
 </script>
 
 <template><section v-if="status || photos.length || error" class="memories" aria-label="Deine Erinnerungen">
@@ -108,8 +111,7 @@ async function download() {
     <div v-if="motif.giphy" class="memory-credit"><span v-if="motif.creator">GIF: @{{ motif.creator }}</span><span class="giphy-plate"><img :src="markDark" alt="Powered by GIPHY" width="160" height="21"></span></div>
   </div>
   <figcaption>SHROOMLIVE / {{ new Date(Number(current.key.slice(0, 13))).toLocaleDateString('de-DE') }}</figcaption>
-</figure>
-<select v-model="format" aria-label="Bildformat"><option value="square">Quadrat · 1:1</option><option value="portrait">Feed · 4:5</option><option value="story">Story · 9:16</option></select> <button class="button" :disabled="saving || !frameUrls.length" @click="download">{{ saving ? 'PNG wird erstellt …' : 'Als PNG speichern' }}</button></template></section></template>
+</figure></template></section></template>
 
 <style scoped>
 .memories{background:#0b1016;padding:14px;border:1px solid #223040}
