@@ -14,4 +14,4 @@ Freigegebene Reaktionen erscheinen zehn Sekunden lang mit deinem Twitch-Namen im
 
 ## Datennutzung
 
-Gespeichert werden deine Twitch-ID, dein Anzeigename und dein Profilbild-Link, das gewählte Motiv und deine Nachricht; diese Einsendungen werden nach einem Tag gelöscht. Die drei Kamerabilder von Robins Reaktion werden für dich 90 Tage aufbewahrt und dann gelöscht. Die Prüfung der Einsendung läuft über OpenAI Moderation. GIF-Suche und GIF-Anzeige laufen direkt zwischen deinem Gerät und GIPHY; GIPHY-Inhalte werden von uns weder gespeichert noch weitergeleitet.
+Gespeichert werden deine Twitch-ID, dein Anzeigename und dein Profilbild-Link, das gewählte Motiv und deine Nachricht; diese Einsendungen werden nach einem Tag gelöscht. Die drei Kamerabilder von Robins Reaktion werden für dich 90 Tage aufbewahrt und dann gelöscht. Die Prüfung der Einsendung läuft über OpenAI Moderation. GIF-Suche und GIF-Anzeige laufen direkt zwischen deinem Gerät und GIPHY; GIPHY-Inhalte werden von uns nicht gespeichert und nicht über unsere Server geleitet.
