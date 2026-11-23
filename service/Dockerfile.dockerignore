@@ -1,11 +1,7 @@
 **
-!service
 !service/server.ts
-!service/Dockerfile
-!src
-!src/catalog.json
-!stage-dist
-!stage-dist/**
+!service/config.ts
 !service/stream-status.ts
-
 !service/memories.ts
+!src/catalog.json
+!stage-dist/**
