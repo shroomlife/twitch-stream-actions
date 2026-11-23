@@ -1,4 +1,5 @@
 import { show, clear } from './stage-renderer'
+import { entryFromFrame } from './stage-frame'
 
 type PhotoEntry = NonNullable<Parameters<typeof show>[0]> & {id:number|string}
 let paintRevision = 0
@@ -18,7 +19,7 @@ let testUntil = 0
 let liveEntry: PhotoEntry|null = null
 const feed = new EventSource(new URL('/stream-actions/events', import.meta.env.VITE_API_URL))
 feed.onmessage = event => {
-  liveEntry = JSON.parse(event.data)
+  liveEntry = entryFromFrame(JSON.parse(event.data), Date.now())
   if (Date.now() >= testUntil) void paint(liveEntry,false)
 }
 feed.onerror = () => { if (Date.now() >= testUntil) { paintRevision++; clear() } }
