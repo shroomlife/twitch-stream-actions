@@ -1,8 +1,8 @@
 FROM oven/bun:1.4.4
 USER root
 WORKDIR /app
-COPY --chown=bun:bun service/server.ts service/config.ts service/stream-status.ts service/memories.ts ./service/
-COPY --chown=bun:bun src/catalog.json ./src/catalog.json
+COPY --chown=bun:bun service/server.ts service/app.ts service/config.ts service/store.ts service/sse.ts service/stream-state.ts service/stream-status.ts service/rate-limit.ts service/helix.ts service/memories.ts service/desktop-credential.ts service/public-url.ts service/eventsub-plan.ts service/eventsub-setup.ts ./service/
+COPY --chown=bun:bun src/catalog.json src/channel.ts ./src/
 COPY --chown=bun:bun stage-dist ./stage-dist
 # /data holds the SQLite database and reaction-photos/; mount a persistent volume here.
 RUN mkdir /data && chown bun:bun /data
