@@ -97,6 +97,7 @@ export function createApp(options: AppOptions) {
     displayTimer = setTimeout(() => {
       endActive()
       publish()
+      signalJobs()
       playNext(stream)
     }, displayMs)
   }
