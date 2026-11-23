@@ -1,4 +1,5 @@
 export interface ExtensionAuthorization {
+  channelId: string
   userId: string
   token: string
 }
@@ -6,7 +7,6 @@ export interface ExtensionAuthorization {
 export interface TwitchExtensionAuthResponse {
   user: {
     id: string
-    owner: boolean
     jwtToken: string
     cooldowns: { giphy: number }
   }

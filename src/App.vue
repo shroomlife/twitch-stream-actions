@@ -5,6 +5,7 @@ import WaitingRoom from '@/components/WaitingRoom.vue'
 import Memories from '@/components/Memories.vue'
 import DefaultHeader from '@/components/DefaultHeader.vue'
 import StreamActions from '@/components/StreamActions.vue'
+import { channelLogin } from '@/channel'
 
 const user = useUserStore()
 onMounted(user.init)
@@ -24,13 +25,14 @@ onMounted(user.init)
       </WaitingRoom>
       <div v-else class="state">
         <p v-if="user.status === 'connecting'" class="boot-state" role="status">Verbinde mit Twitch …</p>
-        <p v-else-if="user.status === 'outside'">Öffne Stream Actions im Twitch-Kanal theshroomlife.</p>
+        <p v-else-if="user.status === 'outside'">Öffne Stream Actions im Twitch-Kanal {{ channelLogin }}.</p>
+        <p v-else-if="user.status === 'other-channel'">Stream Actions gibt es nur bei {{ channelLogin }}. Schau gern dort vorbei!</p>
         <template v-else>
           <p role="alert">Stream Actions ist gerade nicht erreichbar.</p>
           <button type="button" class="button" @click="user.retry">Erneut verbinden</button>
         </template>
       </div>
-      <Memories v-if="user.status==='ready' && user.session" :token="user.session.user.jwtToken" />
+      <Memories v-if="user.status==='ready' && user.session" :viewer="user.session.user.id" :token="user.session.user.jwtToken" />
     </main>
   </div>
 </template>

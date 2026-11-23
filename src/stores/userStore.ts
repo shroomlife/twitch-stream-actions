@@ -6,10 +6,12 @@ import type {
   StreamGiphyResponse,
   TwitchExtensionAuthResponse,
 } from '@/types/global'
+import { channelId } from '@/channel'
 
 type SessionStatus =
   | 'connecting'
   | 'outside'
+  | 'other-channel'
   | 'signed-out'
   | 'link-needed'
   | 'ready'
@@ -25,6 +27,7 @@ export const useUserStore = defineStore('userStore', () => {
   let helperDeadline: ReturnType<typeof setTimeout> | undefined
   let sessionRevision = 0
   let initialized = false
+  let events: EventSource | undefined
 
   async function post<T>(
     path: string,
@@ -66,6 +69,13 @@ export const useUserStore = defineStore('userStore', () => {
     if (latestAuth && latestAuth.userId !== auth.userId)
       resetSession('connecting')
     latestAuth = auth
+
+    // Stream Actions exists only on theshroomlife; elsewhere the panel explains that instead of calling the backend.
+    if (auth.channelId !== channelId) {
+      resetSession('other-channel')
+      return
+    }
+    watchStreamStatus()
 
     if (!auth.userId || auth.userId.startsWith('A')) {
       resetSession('signed-out')
@@ -121,13 +131,21 @@ export const useUserStore = defineStore('userStore', () => {
     helperDeadline = setTimeout(() => {
       status.value = 'unavailable'
     }, 10000)
-    const events = new EventSource(new URL('/stream-actions/events', import.meta.env.VITE_API_URL))
-    const sync = () => { if (latestAuth) void onAuthorized(latestAuth) }
-    events.addEventListener('stream-status', sync)
-    events.onopen = sync
     window.addEventListener('pageshow', sync)
     document.addEventListener('visibilitychange', () => { if (!document.hidden) sync() })
     twitch.onAuthorized(onAuthorized)
+  }
+
+  function sync() {
+    if (latestAuth) void onAuthorized(latestAuth)
+  }
+
+  // Opened once, on the right channel only: live/offline changes refresh the session.
+  function watchStreamStatus() {
+    if (events) return
+    events = new EventSource(new URL('/stream-actions/events', import.meta.env.VITE_API_URL))
+    events.addEventListener('stream-status', sync)
+    events.onopen = sync
   }
 
   function retry() {
