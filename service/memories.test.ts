@@ -2,7 +2,7 @@ import {expect,test} from 'bun:test'
 import {mkdtemp,readFile,copyFile,mkdir} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {listMemories,readFrame,saveMemory} from './memories'
+import {listMemories,pruneMemories,readFrame,RetentionJob,retentionMs,saveMemory} from './memories'
 
 // Solid 1280×720 JPEG frames checked into fixtures/, so the tests need no image tool.
 const fixture=(color:string)=>join(import.meta.dir,'fixtures','frame-'+color.slice(1)+'.jpg')
@@ -41,4 +41,38 @@ test('single photo memories from before the strip stay listed without a motif',a
   await mkdir(join(root,'123'))
   await copyFile(fixture('#ffd23d'),join(root,'123',key+'.jpg'))
   expect(await listMemories(root,'123')).toEqual([{key,frames:1,media:null}])
+})
+
+test('memories older than 90 days are deleted, newer ones stay',async()=>{
+  const root=await mkdtemp(join(tmpdir(),'shroomlive-strip-test-'))
+  const now=Date.now()
+  const frame=await cameraFrame('#4fe3b0')
+  const old=(now-retentionMs-1)+'-'+crypto.randomUUID()
+  const young=(now-retentionMs+60000)+'-'+crypto.randomUUID()
+  await saveMemory(root,'123',old,1,'pilz-wave',frame)
+  await saveMemory(root,'123',old,2,'pilz-wave',frame)
+  await saveMemory(root,'123',young,1,'pilz-wave',frame)
+  await saveMemory(root,'456',old,1,'pilz-wave',frame)
+  await pruneMemories(root,now)
+  expect((await listMemories(root,'123')).map(memory=>memory.key)).toEqual([young])
+  expect(await listMemories(root,'456')).toEqual([])
+  expect(await readFrame(root,'123',old,2)).toBeNull()
+})
+
+test('the retention job runs after a write, once at a time and at most hourly',async()=>{
+  let now=0, runs=0
+  let finish:()=>void=()=>{}
+  const job=new RetentionJob(()=>{runs++;return new Promise<void>(resolve=>{finish=resolve})},()=>now)
+  const first=job.afterWrite()
+  expect(job.afterWrite()).toBe(first)
+  finish()
+  await first
+  now=59*60*1000
+  await job.afterWrite()
+  expect(runs).toBe(1)
+  now=60*60*1000
+  const second=job.afterWrite()
+  finish()
+  await second
+  expect(runs).toBe(2)
 })
