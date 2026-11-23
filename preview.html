@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stream Actions · Kameravorschau</title>
+<style>
+*{box-sizing:border-box}body{max-width:880px;margin:0 auto;padding:24px;background:#080e13;color:#eaf2f6;font:16px/1.45 system-ui}h1{font-size:28px;margin:0}p{color:#aec0c9}iframe{width:100%;aspect-ratio:16/9;border:1px solid #38515c;background:radial-gradient(#34505b 1px,transparent 1px) 0 0/18px 18px,#17232c}form{display:grid;gap:12px;margin-top:18px}label{display:grid;gap:4px}input,select,button{font:inherit;padding:10px;border-radius:6px;border:1px solid #39525f;background:#101a21;color:inherit}button{background:#4fe3b0;color:#071510;font-weight:700;cursor:pointer} [hidden]{display:none}
+</style><h1>Kameravorschau</h1><p>Der Rahmen entspricht einem 16:9-Kamerabild. Jede Reaktion läuft hier zehn Sekunden lang, stumm. Mit „Auf Desktop und in OBS anzeigen“ erscheint sie auch im laufenden Stream, wenn die Webcam-Szene aktiv ist.</p>
+<iframe src="./preview-frame.html" title="Kameraausschnitt"></iframe>
+<form><label>Motiv<select id="motif"></select></label><label id="custom" hidden>GIPHY-ID oder GIF-Link<input id="gif" placeholder="https://giphy.com/gifs/…"></label><label>Nachricht<input id="message" maxlength="128" value="Grüße aus dem Chat! ❤️"></label><button>Nur Vorschau</button><button value="obs">Auf Desktop und in OBS anzeigen · 10 Sekunden</button><output role="status"></output></form><script type="module" src="./src/preview.ts"></script></html>
+
+

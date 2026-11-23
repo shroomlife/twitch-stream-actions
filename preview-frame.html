@@ -1,0 +1,8 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><title>Testreaktion</title><main id="stage"></main><script type="module">
+import { show } from './src/stage-renderer.ts'
+window.addEventListener('message', async e => {
+ if (e.origin !== location.origin || e.source !== parent) return
+ await show(e.data)
+ parent.postMessage({ shown: !!document.querySelector('.motif') }, location.origin)
+})
+</script></html>

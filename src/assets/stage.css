@@ -1,0 +1,42 @@
+@font-face {
+  font-family: Schibsted;
+  src: url('./fonts/schibsted-grotesk-latin-wght-normal.woff2');
+  font-weight: 400 900;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+#stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  height: 100%;
+  width: 96%;
+  margin: auto;
+  padding: 2vh 0;
+  color: white;
+  font: 700 min(4.7vh, 4.2vw)/1.15 Schibsted, sans-serif;
+}
+.credit { flex: none; height: 4.2vh; margin-bottom: 1vh; }
+.motif {
+  flex: 0 1 auto;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  object-fit: contain;
+  object-position: left bottom;
+}
+.caption {
+  flex: none; max-width: 100%;
+  display: grid;
+  justify-items: start;
+  gap: .6vh;
+  margin-top: 1vh;
+  overflow-wrap: anywhere;
+}
+.caption b, .caption span { max-width: 100%; background: #000; border-radius: 0; padding: .45vh 1.4vh; }
+
+
+@font-face { font-family: JetBrains; src: url('./fonts/jetbrains-mono-latin-wght-normal.woff2'); font-weight: 100 800; }
+.caption b { display: flex; align-items: center; gap: .8vh; font-family: JetBrains, monospace; color: #4fe3b0; }
+.avatar { width: 4.8vh; height: 4.8vh; border-radius: 50%; object-fit: cover; }

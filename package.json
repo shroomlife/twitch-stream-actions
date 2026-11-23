@@ -1,11 +1,11 @@
 {
   "name": "twitch-extension-vue-ts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "author": "robin@shroomlife.de",
   "scripts": {
-    "build": "vue-tsc -b && vite build --mode production",
+    "build": "vue-tsc -b && vite build --mode production && vite build --config vite.stage.config.ts --mode production && bun build-stage.ts",
     "build:dev": "vue-tsc -b && vite build --mode staging",
     "dev": "vite",
     "preview": "vite preview"
