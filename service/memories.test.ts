@@ -4,15 +4,15 @@ import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {listMemories,readFrame,saveMemory} from './memories'
 
-async function cameraFrame(root:string,name:string,color:string){
-  const file=join(root,name+'.jpg')
-  expect(await Bun.spawn([process.platform==='win32'?'magick':'convert','-size','1280x720','xc:'+color,file]).exited).toBe(0)
-  return new Uint8Array(await readFile(file))
+// Solid 1280×720 JPEG frames checked into fixtures/, so the tests need no image tool.
+const fixture=(color:string)=>join(import.meta.dir,'fixtures','frame-'+color.slice(1)+'.jpg')
+async function cameraFrame(color:string){
+  return new Uint8Array(await readFile(fixture(color)))
 }
 
 test('a strip keeps three frames and its motif per owner, once each',async()=>{
   const root=await mkdtemp(join(tmpdir(),'shroomlive-strip-test-'))
-  const frames=await Promise.all(['#4fe3b0','#ed38f7','#3de8ff'].map((color,index)=>cameraFrame(root,'frame'+index,color)))
+  const frames=await Promise.all(['#4fe3b0','#ed38f7','#3de8ff'].map(cameraFrame))
   const key=Date.now()+'-'+crypto.randomUUID()
   // A retried upload of the same frame is stored once.
   await Promise.all([saveMemory(root,'123',key,1,'26tPplGWjN0xLybiU',frames[0]),saveMemory(root,'123',key,1,'26tPplGWjN0xLybiU',frames[0])])
@@ -39,7 +39,6 @@ test('single photo memories from before the strip stay listed without a motif',a
   const root=await mkdtemp(join(tmpdir(),'shroomlive-strip-test-'))
   const key=Date.now()+'-'+crypto.randomUUID()
   await mkdir(join(root,'123'))
-  await cameraFrame(root,'legacy','#ffd23d')
-  await copyFile(join(root,'legacy.jpg'),join(root,'123',key+'.jpg'))
+  await copyFile(fixture('#ffd23d'),join(root,'123',key+'.jpg'))
   expect(await listMemories(root,'123')).toEqual([{key,frames:1,media:null}])
 })

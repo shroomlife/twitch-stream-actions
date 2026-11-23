@@ -144,8 +144,7 @@ test('late strip frames go to the shown reaction owner only within the upload wi
       insert.run('456','pilz-wave','shown',now-80000,now-70000)
       insert.run('789','pilz-wave','pending',now,null)
     }finally{db.close()}
-    const sample=join(root,'fixture.jpg')
-    expect(await Bun.spawn([process.platform==='win32'?'magick':'convert','-size','20x20','xc:green',sample]).exited).toBe(0)
+    const sample=join(import.meta.dir,'fixtures','green-20.jpg')
     const token=createHmac('sha256',secret).update('stream-actions/desktop-worker/v1').digest('hex')
     const send=(id:number,frame:number)=>fetch('http://127.0.0.1:'+port+'/stream-actions/camera/'+id+'/'+frame,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'image/jpeg'},body:Bun.file(sample)})
     for(const [id,frame,status] of [[1,1,200],[1,1,200],[1,2,200],[1,3,200],[1,4,400],[2,1,404],[3,1,404]])expect((await send(id,frame)).status).toBe(status)
